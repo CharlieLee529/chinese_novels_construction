@@ -15,8 +15,6 @@ __pycache__/
 
 # Secrets & config with credentials
 chinese_data_construction/config.json
-tools/.env
-
 # OS files
 .DS_Store
 
