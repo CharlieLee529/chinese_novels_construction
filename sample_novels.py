@@ -5,6 +5,7 @@
     python3 sample_novels.py -n 100                    # 按比例抽取100条
     python3 sample_novels.py -n 10                     # 随机抽取10条（<20不按比例）
     python3 sample_novels.py -n 500 -o my_sample.jsonl # 指定输出文件
+    python3 sample_novels.py -n 100 --max-size 512     # 只采样512KB以内的文件
 """
 
 import argparse
@@ -15,17 +16,26 @@ import random
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 DEFAULT_DATA_DIR = Path(__file__).parent / "data"
 
 
-def scan_folders(data_dir: Path) -> dict[str, list[Path]]:
-    """扫描子文件夹，返回 {文件夹名: [json文件路径列表]}。"""
+def scan_folders(data_dir: Path, max_size_kb: Optional[float] = None) -> dict[str, list[Path]]:
+    """扫描子文件夹，返回 {文件夹名: [json文件路径列表]}。
+
+    Args:
+        data_dir: 数据目录路径
+        max_size_kb: 文件大小上限（KB），超过此大小的文件将被排除；None表示不限制
+    """
+    max_size_bytes = max_size_kb * 1024 if max_size_kb is not None else None
     folder_files: dict[str, list[Path]] = {}
     for entry in sorted(data_dir.iterdir()):
         if not entry.is_dir():
             continue
         json_files = sorted(entry.glob("*.json"))
+        if max_size_bytes is not None:
+            json_files = [f for f in json_files if f.stat().st_size <= max_size_bytes]
         if json_files:
             folder_files[entry.name] = json_files
     return folder_files
@@ -75,6 +85,8 @@ def main():
     parser.add_argument("-n", "--num", type=int, required=True, help="抽取数量")
     parser.add_argument("-o", "--output", type=str, default=None, help="输出文件路径（默认 sample_n{num}_{timestamp}.jsonl）")
     parser.add_argument("--data-dir", type=str, default=str(DEFAULT_DATA_DIR), help="数据目录路径")
+    parser.add_argument("--max-size", type=float, default=None,
+                        help="文件大小上限（单位KB），超过此大小的文件将被排除；未指定则不限制")
     args = parser.parse_args()
 
     # 如果未指定输出文件，则自动生成带 num 和时间戳的文件名
@@ -87,12 +99,14 @@ def main():
         print(f"错误: 数据目录不存在: {data_dir}", file=sys.stderr)
         sys.exit(1)
 
-    folder_files = scan_folders(data_dir)
+    folder_files = scan_folders(data_dir, max_size_kb=args.max_size)
     if not folder_files:
         print(f"错误: 数据目录下没有找到包含JSON文件的子文件夹", file=sys.stderr)
         sys.exit(1)
 
     total = sum(len(files) for files in folder_files.values())
+    if args.max_size is not None:
+        print(f"文件大小上限: {args.max_size}KB")
     print(f"扫描到 {len(folder_files)} 个子文件夹，共 {total} 个JSON文件")
 
     n = args.num

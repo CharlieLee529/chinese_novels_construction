@@ -698,15 +698,26 @@ def extract_from_chunk(book, i_c, chunk, truncated_plots=None):
         
         try:
             # Handle different response formats
-            # Sometimes response is just a list of plots
+            # Sometimes response is just a single plot dict
             if (isinstance(response, dict) and 'first_sentence' in response):
-                response = [response]
-            elif isinstance(response, list) and 'first_sentence' in response[0]:
                 response = {
                     'chapter_beginnings': [],
-                    'plots': response,
+                    'plots': [response],
                     'next_chunk_start': None
                 }
+            # Sometimes response is a list of plots
+            elif isinstance(response, list):
+                # Filter out non-dict items and wrap into standard format
+                plot_items = [item for item in response if isinstance(item, dict)]
+                response = {
+                    'chapter_beginnings': [],
+                    'plots': plot_items,
+                    'next_chunk_start': None
+                }
+            # If response is somehow not a dict at this point, bail out
+            elif not isinstance(response, dict):
+                logger.warning(f"Unexpected response type {type(response)}, skipping")
+                return False
 
             chapter_beginnings = response.get('chapter_beginnings', [])
 
@@ -1084,13 +1095,21 @@ def restore_from_cache(book):
                         try:
                             # Normalize response format
                             if (isinstance(response, dict) and 'first_sentence' in response):
-                                response = [response]
-                            elif isinstance(response, list) and 'first_sentence' in response[0]:
                                 response = {
                                     'chapter_beginnings': [],
-                                    'plots': response,
+                                    'plots': [response],
                                     'next_chunk_start': None
                                 }
+                            elif isinstance(response, list):
+                                plot_items = [item for item in response if isinstance(item, dict)]
+                                response = {
+                                    'chapter_beginnings': [],
+                                    'plots': plot_items,
+                                    'next_chunk_start': None
+                                }
+                            elif not isinstance(response, dict):
+                                logger.warning(f"Unexpected response type {type(response)}, skipping")
+                                return False
 
                             chapter_beginnings = response.get('chapter_beginnings', [])
 

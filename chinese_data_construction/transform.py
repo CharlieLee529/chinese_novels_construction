@@ -156,32 +156,26 @@ def process(file):
                 # Process each conversation in the plot
                 for i_c, conversation in enumerate(plot['conversation']):
                     from collections import Counter
-                    # Count utterances per character
-                    utterance_counts = Counter(utterance['character'] 
-                                            for utterance in conversation['dialogues'])
-        
-                    # Sort characters by frequency of speech
-                    speaking_characters_w_env = sorted(utterance_counts, 
-                                                     key=lambda x: utterance_counts[x], 
-                                                     reverse=True)
 
-                    plot_characters = [c['name'] for c in plot['key_characters']]
-
-                    # Standardize conversation character format
+                    # Standardize conversation character format (must happen before utterance counting)
                     conversation_key_characters = []
-                    for c in conversation['key_characters']:
+                    for c in conversation.get('key_characters', []):
                         if 'name' in c:
                             conversation_key_characters.append(c)
                         elif 'character' in c:
                             c['name'] = c.pop('character')
                             conversation_key_characters.append(c)
-                    
+
                     conversation['key_characters'] = conversation_key_characters
 
-                    # Validate and standardize dialogue format
+                    # Validate and standardize dialogue format (must happen before utterance counting)
                     broken_sign = False
-                    for i_u, utterance in enumerate(conversation['dialogues']):
-                        if not 'message' in utterance:
+                    valid_dialogues = []
+                    for i_u, utterance in enumerate(conversation.get('dialogues', [])):
+                        if not isinstance(utterance, dict):
+                            continue
+
+                        if 'message' not in utterance:
                             if 'thought' in utterance:
                                 utterance['message'] = utterance.pop('thought')
                             elif 'description' in utterance:
@@ -199,16 +193,31 @@ def process(file):
                                 else:
                                     broken_sign = True
                                     break
-                        
-                        if not 'character' in utterance:
+
+                        if 'character' not in utterance:
                             if 'name' in utterance:
                                 utterance['character'] = utterance.pop('name')
                             else:
                                 broken_sign = True
                                 break
-                    
+
+                        valid_dialogues.append(utterance)
+
                     if broken_sign:
                         continue
+
+                    conversation['dialogues'] = valid_dialogues
+
+                    # Count utterances per character
+                    utterance_counts = Counter(utterance['character']
+                                            for utterance in conversation['dialogues'])
+
+                    # Sort characters by frequency of speech
+                    speaking_characters_w_env = sorted(utterance_counts,
+                                                     key=lambda x: utterance_counts[x],
+                                                     reverse=True)
+
+                    plot_characters = [c['name'] for c in plot['key_characters']]
 
                     # Skip conversations with no valid characters
                     if len([c for c in utterance_counts if c != ENVIRONMENT]) == 0:

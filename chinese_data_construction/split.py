@@ -30,23 +30,6 @@ DAY_SCENE_HEADING_RE = re.compile(
 PART_HEADING_RE = re.compile(
     rf"^第[{CHINESE_NUM_PATTERN}]+(?:部分?|部)(?:[-－]\d+)?$"
 )
-CUSTOM_BOOK_SHORT_TITLES = {
-    "零的焦点": {
-        "丈夫",
-        "失踪",
-        "北方的疑惑",
-        "地方名士",
-        "沿海的坟场",
-        "大伯子的行动",
-        "前历",
-        "毒死者",
-        "北陆铁道",
-        "逃亡",
-        "丈夫的意义",
-        "雪国的不安",
-    },
-}
-
 
 def normalize_line_for_title(line: str) -> str:
     return re.sub(r"\s+", " ", line.replace("\u3000", " ")).strip()
@@ -64,7 +47,6 @@ def is_directory_line(line: str) -> bool:
 
 
 def classify_chapter_title(line: str, book_title: Optional[str] = None) -> Optional[str]:
-    normalized_title = normalize_book_title(book_title)
     if ENGLISH_CHAPTER_RE.match(line) or CHINESE_CHAPTER_RE.match(line):
         return "standard"
     if DAY_SCENE_HEADING_RE.match(line):
@@ -77,8 +59,6 @@ def classify_chapter_title(line: str, book_title: Optional[str] = None) -> Optio
         return "numbered"
     if SPACED_NUM_HEADING_RE.match(line):
         return "spaced_numbered"
-    if line in CUSTOM_BOOK_SHORT_TITLES.get(normalized_title, set()):
-        return "book_specific"
     return None
 
 
@@ -104,7 +84,7 @@ def find_chapter_matches(content: str, book_title: Optional[str] = None):
         kind = classify_chapter_title(stripped, book_title)
         prev_blank = idx == 0 or not lines[idx - 1].strip()
         next_blank = idx + 1 >= len(lines) or not lines[idx + 1].strip()
-        weak_title = kind in {"numbered", "spaced_numbered", "paren_series", "book_specific"}
+        weak_title = kind in {"numbered", "spaced_numbered", "paren_series"}
         if kind and (not weak_title or prev_blank or next_blank):
             matches.append(
                 {
